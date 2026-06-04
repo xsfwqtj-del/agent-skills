@@ -1,0 +1,7 @@
+# === 工具缓存 ===
+.worldbook/
+
+# === CC 配置（不上传） ===
+.claude/
+.claude.json
+.mcp.json
