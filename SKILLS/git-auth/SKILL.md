@@ -41,9 +41,10 @@ Classic token (`ghp_...`)，在 github.com/settings/tokens 生成，勾选了：
 
 | 仓库 | 可见性 | 本地路径 | 用途 |
 |------|--------|---------|------|
-| mioplugin | PRIVATE | d:/mio/ | Mio 记忆管线插件 |
+| mioplugin | PRIVATE | d:/mio/ | Mio 记忆管线插件 + 老 Agent 归档 |
 | jingxiju | PRIVATE | d:/烬汐居/ | 角色卡生产工作区 |
 | agent-skills | PUBLIC | d:/skills/ | 自定义 Agent Skills |
+| mio | PRIVATE | d:/godot-ai-tavern/ | LLM 酒馆（Godot 客户端） |
 
 ## 安全检查
 
