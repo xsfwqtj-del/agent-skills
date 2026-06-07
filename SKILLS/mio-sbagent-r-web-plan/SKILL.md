@@ -1,12 +1,12 @@
 ---
 name: mio-sbagent-r-web-plan
-description: Mio-SBAgent-R-WEB-plan — 技术方案写作流程。当用户需要可执行的多步骤行动计划时触发——迁移、改造、重构、架构设计、技术选型、怎么搭建、怎么部署、定方案、出计划、梳理思路。不触发：定点修复（"这段代码怎么修"）、纯答疑（"这个什么意思"）、单步操作（"怎么用这个API"）。先判断意图再匹配关键词，意图优先。
+description: Use when the user needs an executable multi-step action plan — migration, refactoring, architecture design, technology selection, deployment planning, or strategy development. Do NOT trigger for: spot fixes, definition questions, single-step API lookups. Prioritize intent over keyword matching.
 trigger: auto
 ---
 
 # 技术方案写作流程
 
-> 版本: v3.14.0 | 更新: 吸收 brainstorming 三项能力——步骤 1 加歧义检测与澄清提问、步骤 2 加多方案对比、步骤 4→5 插入用户签字关卡
+> 版本: v3.14.1 | 更新: CSO 修复 + Red Flags 章节
 
 ---
 
@@ -205,6 +205,17 @@ trigger: auto
 *   **审查不是走形式**：修正项不是绩效指标。审查日志全部通过是正常结果——有问题才记，没问题就记通过。
 *   **降维不是万能钥匙**：降维后仍搜不到，老老实实标注 `[无直接参考]`。宁可承认信息缺口。
 *   **别把分析当做事**：步骤 1/2 的目的是理解和分解问题，不是解决问题。常见错误是步骤 1 就开始构思解法，跳过了搜索，导致方案思路窄。
+
+---
+
+## Red Flags
+
+- "这个方案很简单不需要审查"
+- "用户没明说但应该是这个意思"（第 1 条铁律——不猜）
+- "跳过步骤 4.5 用户签字关卡没关系"
+- "搜索结果是空的就算了"
+
+**出现以上想法时，重新读本文件。**
 
 ---
 

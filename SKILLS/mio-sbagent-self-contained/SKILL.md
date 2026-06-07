@@ -1,12 +1,12 @@
 ---
 name: mio-sbagent-self-contained
-description: Mio-SBAgent-Self-Contained — AI agent 可读的代码模块规范。写新代码、新建模块、组织文件结构时自动触发。每一个 .py/.ts 文件 Ctrl+A 全选丢进 AI 窗口，读完头部就能干活——不翻别的文件，不需要人解释项目背景。
+description: Use when writing new code, creating new modules, or organizing file structure and need AI agents to understand modules without reading other files or needing project background. Applies to .py and .ts files following the self-contained module pattern.
 trigger: auto
 ---
 
 # Mio-SBAgent-Self-Contained
 
-> 版本: v3.0.0 | 日期: 2026-06-05 | 全部 8 分支完成
+> 版本: v3.0.1 | 日期: 2026-06-05 | 全部 8 分支完成 | 更新: CSO修复+常见错误+Red Flags+不适用场景
 > 替换: ai-native-dev v1.1.0
 
 ## 北极星
@@ -575,6 +575,35 @@ class AgentRunner {
   }
 }
 ```
+
+---
+
+## 常见错误
+
+| 错误 | 预防 |
+|------|------|
+| 写得太多——把自包含误解为"完整文档" | 头部是合约不是文档。AI 读完合约就该能决定要不要继续读 |
+| 只写不导航——没加标签分段 | `[A]` `[B]` 标签是硬要求。没有导航 AI 必须全文读完 |
+| 头部信息过时——改代码没同步改合约 | 合约先于代码。改了函数签名必须同步更新头部 |
+| 把自包含误解为隔离 | 模块可以依赖外部接口，但接口签名写在头部里 |
+
+---
+
+## Red Flags
+
+- "这个模块很简单不需要头部"
+- "头部以后再补"
+- "把整个 README 当头部"
+
+**这些全部意味着你正在违反自包含原则。**
+
+---
+
+## 不适用场景
+
+- 配置文件（JSON/YAML/TOML）→ 不是 .py/.ts 模块
+- 一次性脚本 → 不会反复被 AI agent 读取
+- 第三方库代码 → 不归本模块规范管辖
 
 ---
 
