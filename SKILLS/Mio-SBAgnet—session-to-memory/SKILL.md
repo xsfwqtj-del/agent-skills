@@ -5,7 +5,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
 
 # Mio-SBAgent — Session → Memory 转化引擎
 
-> 版本: v1.0.1 | 更新: CSO 修复——description 移除 pipeline 总结，仅保留触发条件
+> 版本: v2.0.0 | 更新: 吸收 distilling-discussions 全部要素——source标注、分幕+引用锚定、讨论类蒸馏格式、推理链检测、核心哲学、质量验收、常见错误、Red Flags。distilling-discussions 已删除。
 
 将 CC 会话 JSONL 转化为结构化记忆文件。外部 agent 打开本文件即开始执行。
 
@@ -38,16 +38,18 @@ description: Use when the user wants to archive sessions, extract knowledge from
 2. **源识别**: 识别 agent 类型（CC/Codex/Hermes/WorkBuddy...），确定字段映射表
 3. **会话概要**: 预读前 5 条 exchange → 判断第一条用户消息；从 `cwd` 判断项目
 4. **处理决策**: 纯闲聊（<10 exchange，无工具调用）→ 跳过；大会话（>5MB）→ 标记需分片
+5. **推理链检测**: 跨越 3+ 话题领域 / 有反问、纠正、推翻原方案 / 持续超过 30 轮 → 标记 `hasReasoningChain: true`
 
-输出: `[{sessionId, agentType, project, intent, size, exchanges, skip, needsSharding}]`
+输出: `[{sessionId, agentType, project, intent, size, exchanges, skip, needsSharding, hasReasoningChain}]`
 
 ### ❷ 源适配 + 去噪（脚本）
 
 1. 按 agent 类型映射字段 → 统一中间格式（见 `references/06-extraction-format.md`）
-2. 去噪：砍 hook 注入文本、skill 列表、tool-use metadata、系统消息、中断信号
-3. 统计工具调用：记录所有 tool call（类型、次数、目标文件/命令）
+2. **source 标注**：给每条 exchange 附加 `source: {文件名}:{起始行号}-{结束行号}`，从原始 JSONL 的行号直接读取
+3. 去噪：砍 hook 注入文本、skill 列表、tool-use metadata、系统消息、中断信号（被砍掉的 exchange 保留 source 标注但标记为 `noise: true`）
+4. 统计工具调用：记录所有 tool call（类型、次数、目标文件/命令）
 
-**输出**: 清洁对话流 + `operationsSummary`（工具/命令/文件统计）
+**输出**: 清洁对话流（每条带 `source` 标注）+ `operationsSummary`（工具/命令/文件统计）
 
 **参考**: 读取 `references/06-extraction-format.md`
 
@@ -69,8 +71,9 @@ description: Use when the user wants to archive sessions, extract knowledge from
 **对每个主题，一步完成**：
 
 1. **关键词回搜聚拢**: 用 `uniqueKeywords` 回搜全对话流，聚拢所有相关 exchange（包括对话中间隔断的同一主题片段）
-2. **提取**: 起因、过程、结果、因果、产出物。**质量门禁**——不得出现"用户发起对话""待补充""N/A"。
-3. **分类**: 按 `references/01-classification.md` 的提取信号 + 决策树判定（一个主题可产出多条不同分类的记忆）
+2. **分幕组织**：同一主题内按推理阶段分组。一幕 = 一个阶段性核心问题，幕之间是"老问题被推翻→新问题浮现"的关系。如果主题是线性讨论无推翻，则不需要分幕
+3. **提取**: 起因、过程、结果、因果、产出物。**质量门禁**——不得出现"用户发起对话""待补充""N/A"。**引用锚定**——每条关键发现必须附 `[来源: {file}:{line_range}]`，直接使用步骤 ❷ 的 source 标注，不凭记忆归纳
+3. **分类**: 按 `references/01-classification.md` 的提取信号 + 决策树判定（一个主题可产出多条不同分类的记忆）。讨论类记忆采用蒸馏格式——正文包含幕+链条+引用锚定+决策记录+全链路缩略，外面包统一格式（标题/日期/分类/关键词/操作环境段），纳入 manifest 追踪和 aggregate 统计
 4. **打标**: 项目(cwd)、时间(timestamp)、主题ID(topicId)、关键词(3-8个)、前置主题ID、关联
 5. **生成 .md**: 按 `references/02-file-format.md` 完整模板生成，**末尾追加"操作环境"段**
 
@@ -161,3 +164,43 @@ description: Use when the user wants to archive sessions, extract knowledge from
 - 去重是增量安全的——重复跑不会产生重复文件
 - 步骤 ❹ 提取时宁可多写不少写——步骤 ❺ 去重融合会处理冗余
 - "操作环境"段从 JSONL 的工具调用中提取，不需要 LLM 判断——脚本在步骤 ❷ 已整理好
+
+---
+
+## 核心原则
+
+不是总结，是蒸馏。保留每一个推导跳步的原文证据（爸爸的原话、搜索结论的原文），确保失忆后能无歧义重建整个推理过程。每条关键发现必须有 `[来源: {file}:{line}]` 标注。不凭记忆归纳——翻对话记录，找原文。
+
+---
+
+## 质量验收
+
+每次运行完成后自检：
+
+- [ ] 每条关键发现能找到对应的 source 引用（文件名+行号）
+- [ ] 每个文件/方案能找到对应的讨论链条
+- [ ] 一个没参与讨论的人读完能复述"我们为什么做了这些决定"
+- [ ] 没有"后来就..."的模糊跳步——每一步的推理依据都写明了
+- [ ] 输出摘要中的阈值提醒已检查（同类错误 ≥ 3、问题 ≥ 5）
+
+---
+
+## 常见错误
+
+| 错误 | 预防 |
+|------|------|
+| 凭记忆归纳而非翻原文 | "后来就..."式跳步是红线。每条发现必须有 source 标注 |
+| 只写结论不追溯推导过程 | 从结论往前问"这个怎么来的"，一直追到触发事件 |
+| 把蒸馏当总结——省略推理链只给要点 | 蒸馏保留跳步，总结压缩信息。二者不同 |
+| 跳过了操作环境段 | 操作环境段是讨论→产物的因果关系记录 |
+
+---
+
+## Red Flags
+
+- "这个讨论很简单不需要蒸馏"
+- "大概就是这样的"
+- "我记不太清但应该..."
+- "后来就做了..."
+
+**以上想法出现时，回到原文翻对话记录。**
