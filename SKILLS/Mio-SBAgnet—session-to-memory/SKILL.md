@@ -5,7 +5,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
 
 # Mio-SBAgent — Session → Memory 转化引擎
 
-> 版本: v2.3.3 | 更新: 跨会话去重第二步改为 Jaccard+低热度专有名词约束，关键词生成优先低热度词
+> 版本: v2.4.0 | 通用技能——移除所有用户/项目特定绑定
 
 将 CC 会话 JSONL 转化为结构化记忆文件。外部 agent 打开本文件即开始执行。
 
@@ -84,7 +84,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
 ```
 □ 错误 — 有没有被纠正的行为？
 □ 决策 — 有没有选 A 不选 B？
-□ 偏好 — 有没有爸爸的风格/喜好要求？
+□ 偏好 — 有没有用户的风格/喜好要求？
 □ 模式 — 有没有重复出现 ≥ 2 次的规律？
 □ 排除 — 有没有明确不做的方案？
 □ 不变量 — 有没有确认后不会变的事实？
@@ -146,7 +146,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
      Jaccard ≥ 0.4 且 共同词含 ≥1 个低热度专有名词 → 写入 关联: [[...]]
      否则 → 独立新建
    ```
-3. **阈值检查**: 同类错误 ≥ 3 触发立法提醒，问题 ≥ 5 触发审查提醒
+3. **统计提示**: 本批提取的记忆中，同分类 ≥ 3 条时在输出摘要中标注（数量已在分类统计中体现，不额外重复）。同分类 + 关键词重叠 ≥ 2 且 ≥ 3 条时 → 备注"⚠ 注意: [分类] 类出现高频重叠，建议人工复查是否为同一事件"
 
 **参考**: 读取 `references/03-keywords.md`
 
@@ -175,9 +175,8 @@ description: Use when the user wants to archive sessions, extract knowledge from
 
 去重合并: n 条
 
-阈值提醒:
-  [如有] 🔴 XX类累计 ≥ 3 → 触发立法提醒
-  [如有] 🟡 问题累计 ≥ 5 → 建议规划审查
+统计提示:
+  [如有] ⚠ XX类出现高频重叠（≥3条且关键词重叠≥2）→ 建议人工复查
 
 写入文件:
   Mio-SBAgnet—memory/问题/01_Harness层hook全部缺失.md
