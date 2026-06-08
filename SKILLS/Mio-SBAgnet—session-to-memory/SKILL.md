@@ -48,8 +48,9 @@ description: Use when the user wants to archive sessions, extract knowledge from
 2. **source 标注**: 给每条 exchange 附加 `source: {文件名}:{起始行号}-{结束行号}`，从原始 JSONL 的行号直接读取（纯机械操作）
 3. 去噪：砍 hook 注入文本、skill 列表、tool-use metadata、系统消息、中断信号（被砍掉的 exchange 保留 source 标注但标记为 `noise: true`）
 4. 统计工具调用：记录所有 tool call（类型、次数、目标文件/命令）
+5. **Write content 提取**: 对 `tool_name` 为 `"Write"` / `"Edit"` 的调用，提取 `file_path` + `content` + `timestamp`，写入 `operationsSummary.writeContents` 数组。content 过长的（>2000 字符）截取前 500 字符作为 snippet，总长度写入 `charLength`，完整正文写入独立快照文件 `{记忆目录}/_write-snapshots/{pathEncoded}.md`，附带 frontmatter `created` 时间戳
 
-**输出**: 清洁对话流（每条带 `source` 标注）+ `operationsSummary`（工具/命令/文件统计）
+**输出**: 清洁对话流 + `operationsSummary`（含 `writeContents`）+ `_write-snapshots/` 目录
 
 **参考**: 读取 `references/06-extraction-format.md`
 
@@ -131,7 +132,8 @@ description: Use when the user wants to archive sessions, extract knowledge from
 2. 路径: `{记忆目录}/{分类}/{序号}_{标题}.md`，序号按已有文件自动递增
 3. 从每条 .md 的"操作环境"段汇聚 → 更新 `{记忆目录}/_aggregate/stats.json`
 4. 更新 `.manifest.json`，当前会话标记为 `processed`
-5. 按输出摘要格式报告结果
+5. Write content 快照落地: `_write-snapshots/{pathEncoded}.md`，frontmatter 含 `created` 时间戳
+6. 按输出摘要格式报告结果
 
 **参考**: 读取 `references/02-file-format.md` `references/05-pipeline.md`
 
