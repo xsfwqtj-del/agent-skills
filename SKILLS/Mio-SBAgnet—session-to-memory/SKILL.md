@@ -5,7 +5,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
 
 # Mio-SBAgent — Session → Memory 转化引擎
 
-> 版本: v2.3.2 | 更新: 修复操作环境/aggregate 会话级-vs-topic级统计源矛盾
+> 版本: v2.3.3 | 更新: 跨会话去重第二步改为 Jaccard+低热度专有名词约束，关键词生成优先低热度词
 
 将 CC 会话 JSONL 转化为结构化记忆文件。外部 agent 打开本文件即开始执行。
 
@@ -142,9 +142,9 @@ description: Use when the user wants to archive sessions, extract knowledge from
      是 → 合并，更新时间线（追加"## YYYY-MM-DD 更新"段）
      否 → 独立新建
      不确定 → 进入第二步
-   第二步 — 关键词辅助裁决：
-     重叠 ≥ 3 → 写入 关联: [[...]]，各自保留
-     重叠 < 3 → 独立新建
+   第二步 — 关键词辅助裁决（Jaccard + 低热度约束，详见 references/03-keywords.md）：
+     Jaccard ≥ 0.4 且 共同词含 ≥1 个低热度专有名词 → 写入 关联: [[...]]
+     否则 → 独立新建
    ```
 3. **阈值检查**: 同类错误 ≥ 3 触发立法提醒，问题 ≥ 5 触发审查提醒
 
