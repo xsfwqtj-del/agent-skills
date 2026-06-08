@@ -50,16 +50,24 @@
     "topicId": "topic-deaddc90-001",
     "summary": "全链路审计发现Harness缺失",
     "uniqueKeywords": ["Harness", "hook", "settings.json", "执行层"],
+    "commonKeywords": [],
     "categoryHint": ["问题", "决策"],
     "exchangeRange": {"first": 1, "last": 28},
-    "precedingTopicId": null
+    "precedingTopicIds": [],
+    "primaryWriteOps": [],
+    "sharedWriteOps": []
   }
 ]
 ```
 
 ## 步骤 ❹ 生成 .md
 
-每个主题一步完成聚拢→提取→分类→打标→生成 .md。完整模板见 `references/02-file-format.md`。末尾必含"操作环境"段，信息来自步骤 ❷ 的 operationsSummary。
+每个主题一步完成聚拢→提取→分类→打标→生成 .md。完整模板见 `references/02-file-format.md`。末尾必含"操作环境"段。
+
+**操作环境段字段来源**：
+- `会话`/`来源文件`/`时间`/`技能`/`工具`/`外部命令` → 步骤 ❷ operationsSummary（脚本统计产出）
+- `新发现` → 步骤 ❹ LLM 判断产出（本主题中发现的 CC 特性/外部知识/bug，LLM 识别后填入）
+- `前置主题` → 步骤 ❸ 主题列表
 
 ## 步骤 ❺ 去重融合
 
