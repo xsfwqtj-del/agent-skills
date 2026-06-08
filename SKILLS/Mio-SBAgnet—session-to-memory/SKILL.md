@@ -5,7 +5,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
 
 # Mio-SBAgent — Session → Memory 转化引擎
 
-> 版本: v2.3.0 | 更新: 原文锚点 + 多信号去重 + 重审 + 门禁持久化 + 关键词交叉排他 + Write-主题联动 + 裁切检查点/会话级去重恢复 + hasReasoningChain可执行化 + 分片overlap + 时间标注统一 + schema修正 + 外部agent兼容增强
+> 版本: v2.3.1 | 更新: 原文锚点(文件名:行号) + 级联去重 + 重审 + 门禁持久化(数组) + 关键词允许重叠 + Write-主题联动 + 会话级去重 + hasReasoningChain一次判断 + 分片overlap+合并规则 + 时间/统计范围限定topic + schema修正 + manifest .lock + 外部agent兼容
 
 将 CC 会话 JSONL 转化为结构化记忆文件。外部 agent 打开本文件即开始执行。
 
@@ -42,7 +42,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
    - A. 预读前 5 条 exchange 中检测到 ≥3 个不同 cwd 路径
    - B. 会话轮次 > 30 AND 含工具调用 > 10
    - C. 含关键词"不对"/"推翻"/"重新来"/"换个方案"/"回到" ≥2 次
-   步骤 ❸ 生成主题列表后，若 topicId 数量 ≥ 3，可将 hasReasoningChain 升级为 true（LLM 补充判断）
+   仅在步骤 ❶ 判断一次，后续步骤使用该值，不升级。
 
 输出: `[{sessionId, agentType, project, intent, size, exchanges, skip, needsSharding, hasReasoningChain}]`
 
@@ -69,11 +69,9 @@ description: Use when the user wants to archive sessions, extract knowledge from
 
 **识别原则**: 不是按时间切——同一主题即使分散在多处也会被关键词聚拢回来。寻找对话中的"话题切换点"作为边界提示，但不强制切分。
 
-**关键词交叉排他验证**：生成完整主题列表后，对每对主题 (A, B)，检查 A.uniqueKeywords 是否出现在 B 的任意 exchange 中。若有重叠：降级为 `commonKeywords`，补充替代关键词或接受聚拢范围扩大风险。
+**关键词允许重叠**：关键词可能跨主题共现，这是正常的（如"DeepSeek"同时出现于"缓存机制"和"API 选型"两个主题）。聚拢时不要求排他——LLM 根据关键词 + 上下文语义综合判断 exchange 归属。对于跨主题的 exchange（含多个话题），可同时归属多个主题。
 
 **Write 操作分配**（附加任务，同一 pass 完成）：对 `operationsSummary.writeContents` 每个条目，判断最可能属于哪个 topicId。若跨多个主题，标记 primary + secondary[]。输出字段：`primaryWriteOps: string[]` + `sharedWriteOps: string[]`。
-
-**裁切检查点**：对每个 topic，确认 topicId 最后一段编号（NNN）不能等于 sessionId。若全部 topic 的 exchangeRange 覆盖整个会话无裁切 → 回退重做。
 
 **参考**: 读取 `references/04-topic-identification.md`
 
@@ -107,23 +105,23 @@ description: Use when the user wants to archive sessions, extract knowledge from
 
 **对每个 ✓ 分类，一步完成**：
 
-1. **关键词回搜聚拢**: 用 `uniqueKeywords` 回搜全对话流，聚拢所有相关 exchange（包括对话中间隔断的同一主题片段）。若有 `commonKeywords`，聚拢时注意其可出现在多个主题中，不作为排他信号
+1. **关键词回搜聚拢**: 用 `uniqueKeywords` 回搜全对话流，聚拢所有相关 exchange（包括对话中间隔断的同一主题片段）。关键词可跨主题重叠，重叠的 exchange 可归属多个主题——LLM 根据上下文语义判断归属
 2. **提取**: 起因、过程、结果、因果、产出物。**质量门禁**——不得出现"用户发起对话""待补充""N/A"；关键发现应能追溯到步骤 ❷ 的 source 标注
-3. **原文锚点**: 对 `错误`、`决策`、`不变量`、`偏好` 四类，每条关键结论从步骤 ❷ 清洁对话流中截取 ≤50 token 的逐字原文引用，标注 exchange 编号，写入 `## 原文` 段。格式：`> "[逐字引用，引自 exchange #N]"`
+3. **原文锚点**: 对 `错误`、`决策`、`不变量`、`偏好` 四类，每条关键结论从步骤 ❷ 清洁对话流中截取 ≤50 token 的逐字原文引用，标注 `{文件名}:{行号范围}`（取自步骤 ❷ 的 source 标注），写入 `## 原文` 段。格式：`> "[逐字引用，来源: {文件名}:{行号范围}]"`
 4. **分类**: 按 `references/01-classification.md` 的提取信号 + 决策树判定（一个主题可产出多条不同分类的记忆）。讨论类记忆可用更丰富的推理链格式（见分类定义），但不强制
 5. **打标**: 项目(cwd)、时间(取 topic 第一个 exchange 的 timestamp，格式 `YYYY-MM-DD HH:MM`，从步骤 ❷ 中间格式直接取)、主题ID(topicId)、关键词(3-8个)、前置主题ID(数组)、关联、门禁记录(取步骤 ❸.5 结果)
 6. **生成 .md**: 按 `references/02-file-format.md` 完整模板生成，**末尾追加"操作环境"段**
 
-**操作环境段**（每条 .md 末尾必带，除"新发现"外均从步骤 ❷ operationsSummary 直接取）:
+**操作环境段**（每条 .md 末尾必带。统计数据限本 topic exchangeRange 内，不从全会话取）:
 ```markdown
 ## 操作环境
 - 会话: {sessionId}
 - 来源文件: {filename}
 - 时间: {HH:MM - HH:MM}（取 topic exchangeRange 的首尾 timestamp）
-- 技能: [列出本主题涉及的所有 skill 调用]
-- 工具: Read(N), Bash(N), Write(N), WebSearch(N)
-- 外部命令: [npx/powershell 等]
-- 新发现: [步骤 ❹ LLM 判断：本主题中发现的 CC 特性/外部知识/bug]
+- 技能: [本 topic exchangeRange 内调用的 skill]
+- 工具: [本 topic exchangeRange 内的工具调用次数]
+- 外部命令: [本 topic exchangeRange 内的外部命令]
+- 新发现: [仅记本 topic 中首次遇到的、非显而易见的发现。常规外部知识搜索结果归入知识类记忆，不在此重复]
 - 前置主题: [topicId 数组，如无则写 []]
 ```
 
@@ -138,16 +136,15 @@ description: Use when the user wants to archive sessions, extract knowledge from
 1. **同会话内**: 
    - 同一 sessionId + 同一分类 + 标题语义相似（LLM 判断）→ 合并为同一条，补充正文细节
    - 其他主题重叠 → 合并为一条，补充细节
-2. **跨会话**: 与已有记忆文件比对，采用三路信号融合：
+2. **跨会话**: 与已有记忆文件比对，采用级联判断（不用数值打分）：
    ```
-   综合去重得分 =
-     0.5 × 语义相似度（标题 + 摘要，LLM 判断"这两条是同一事件吗？"）
-     + 0.3 × 关键词重叠率（交集 / 并集）
-     + 0.2 × 同类别加成（同一 11 类则 +1，否则 +0）
-   
-   得分 ≥ 0.65 → 候选合并，LLM 最终判断（同事件则更新时间线追加"## YYYY-MM-DD 更新"段）
-   得分 0.4-0.65 → 写入 关联: [[...]]，不合并
-   得分 < 0.4 → 独立新建
+   第一步 — LLM 判断是否为同一事件：是 / 否 / 不确定
+     是 → 合并，更新时间线（追加"## YYYY-MM-DD 更新"段）
+     否 → 独立新建
+     不确定 → 进入第二步
+   第二步 — 关键词辅助裁决：
+     重叠 ≥ 3 → 写入 关联: [[...]]，各自保留
+     重叠 < 3 → 独立新建
    ```
 3. **阈值检查**: 同类错误 ≥ 3 触发立法提醒，问题 ≥ 5 触发审查提醒
 
@@ -216,7 +213,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
 
 1. **按 session 分片**：每个 agent 处理不重叠的会话组，避免同 session 冲突。同 sessionId 的所有主题必须由同一 agent 处理
 2. **序号预分配**：步骤 ❻ 写入前先读取目标分类目录，计算序号范围并声明占用
-3. **manifest 锁**：更新 `.manifest.json` 前，先读当前内容，合并新条目后一次性写入。若写入时发现内容已被其他 agent 修改（JSON 内容与读取时不一致），重试最多 3 次
+3. **manifest 锁**：更新 `.manifest.json` 前，创建 `{记忆目录}/.manifest.lock` 空文件作为排他锁。写入完成后删除锁文件。若锁文件已存在，等待最多 5 秒后重试。超时则跳过该 session 的 manifest 更新（不阻塞管线，下次运行补写）
 4. **会话级单写**：同 sessionId 的所有事件必须由同一 agent 处理并写入——不跨 agent 拆分
 
 ## Gotchas

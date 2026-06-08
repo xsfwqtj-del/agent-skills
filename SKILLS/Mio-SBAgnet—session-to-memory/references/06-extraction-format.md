@@ -50,7 +50,6 @@
     "topicId": "topic-deaddc90-001",
     "summary": "全链路审计发现Harness缺失",
     "uniqueKeywords": ["Harness", "hook", "settings.json", "执行层"],
-    "commonKeywords": [],
     "categoryHint": ["问题", "决策"],
     "exchangeRange": {"first": 1, "last": 28},
     "precedingTopicIds": [],
