@@ -5,7 +5,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
 
 # Mio-SBAgent — Session → Memory 转化引擎
 
-> 版本: v2.3.1 | 更新: 原文锚点(文件名:行号) + 级联去重 + 重审 + 门禁持久化(数组) + 关键词允许重叠 + Write-主题联动 + 会话级去重 + hasReasoningChain一次判断 + 分片overlap+合并规则 + 时间/统计范围限定topic + schema修正 + manifest .lock + 外部agent兼容
+> 版本: v2.3.2 | 更新: 修复操作环境/aggregate 会话级-vs-topic级统计源矛盾
 
 将 CC 会话 JSONL 转化为结构化记忆文件。外部 agent 打开本文件即开始执行。
 
@@ -112,7 +112,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
 5. **打标**: 项目(cwd)、时间(取 topic 第一个 exchange 的 timestamp，格式 `YYYY-MM-DD HH:MM`，从步骤 ❷ 中间格式直接取)、主题ID(topicId)、关键词(3-8个)、前置主题ID(数组)、关联、门禁记录(取步骤 ❸.5 结果)
 6. **生成 .md**: 按 `references/02-file-format.md` 完整模板生成，**末尾追加"操作环境"段**
 
-**操作环境段**（每条 .md 末尾必带。统计数据限本 topic exchangeRange 内，不从全会话取）:
+**操作环境段**（每条 .md 末尾必带。统计数据由 LLM 从清洁对话流的 topic exchangeRange 内统计，不从 operationsSummary 取——operationsSummary 是会话级聚合）:
 ```markdown
 ## 操作环境
 - 会话: {sessionId}
@@ -154,7 +154,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
 
 1. 按 `references/02-file-format.md` 的模板逐个写入 .md
 2. 路径: `{记忆目录}/{分类}/{序号}_{标题}.md`，序号按已有文件自动递增
-3. 从每条 .md 的"操作环境"段汇聚 → 更新 `{记忆目录}/_aggregate/stats.json`
+3. 从步骤 ❷ `operationsSummary` 取 session 级统计数据 → 更新 `{记忆目录}/_aggregate/stats.json`（不从 .md 操作环境段汇聚——后者是 topic 级统计）
 4. 更新 `.manifest.json`，当前会话标记为 `processed`
 5. Write content 快照落地: `_write-snapshots/{pathEncoded}.md`，frontmatter 含 `created` 时间戳
 6. 按输出摘要格式报告结果
@@ -223,7 +223,7 @@ description: Use when the user wants to archive sessions, extract knowledge from
 - manifest 是会话级追踪——处理过的会话第二次跑会跳过；如需重新处理，从 manifest 删除对应条目
 - 去重是增量安全的——重复跑不会产生重复文件
 - 步骤 ❹ 提取时宁可多写不少写——步骤 ❺ 去重融合会处理冗余
-- "操作环境"段除"新发现"外均从步骤 ❷ operationsSummary 直接取——脚本已整理好。"新发现"字段由步骤 ❹ LLM 判断填入
+- "操作环境"段的技能/工具/外部命令从清洁对话流 topic exchangeRange 内统计（LLM 完成），会话/来源文件/时间从步骤 ❷ 取。"新发现"由步骤 ❹ LLM 判断填入
 
 ---
 
@@ -232,5 +232,5 @@ description: Use when the user wants to archive sessions, extract knowledge from
 每次运行完成后自检：
 
 - [ ] 提取完整：识别出的主题数 = 实际写入的记忆覆盖的主题数
-- [ ] 工具统计来自脚本：operationsSummary 的数字从 JSONL 统计，非估算
+- [ ] 工具统计来自脚本：_aggregate 中的 toolUsage 从 operationsSummary 取（会话级），.md 操作环境中的工具次数由 LLM 从清洁对话流 topic 范围内统计
 - [ ] source 可追溯：关键发现的来源文件和行号来自步骤 ❷ 标注，非凭记忆归纳
